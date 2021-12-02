@@ -15,7 +15,7 @@ x_min = -10
 x_max = 10
 dx = 0.001
 
-x = np.arange(x_min, x_max, dx)
+x = np.arange(x_min, x_max+dx, dx)
 y = f(x)
 
 res = {
@@ -30,11 +30,11 @@ file = path / "result_task1.json"
 out = file.open("w")
 # 2 способ file = open("result.json", "w")
 # 2 способ file.write(json.dumps(res, indent=4))
-json.dump(res, out, indent=4)
+json.dump(res, out)
 out.close()
 
 
 pylab.plot(x, y)
 pylab.grid()
-# pylab.show()
 pylab.savefig("results/task1.png")
+pylab.show()
