@@ -1,15 +1,16 @@
-# -*- coding: utf-8 -*-
-'''
-Моделирование распространения ЭМ волны, падающей на границу
-вакуум - идеальный диэлектрик.
-Используются граничные условия ABC первой степени.
-'''
-
 import numpy
-from numpy.fft import fft,fftshift
-import tools
+import math
+from numpy.fft import fft, fftshift
 import matplotlib.pyplot as plt
 
+import tools
+
+class Sampler:
+    def __init__(self, discrete: float):
+        self.discrete = discrete
+
+    def sample(self, x: float) -> int:
+        return math.floor(x / self.discrete + 0.5)
 
 class Ricker:
     ''' Класс с уравнением плоской волны для сигнала Вейвлета Рикераа в дискретном виде
@@ -32,49 +33,66 @@ class Ricker:
         Расчет поля E в дискретной точке пространства m
         в дискретный момент времени q
         '''
-        return (1-2*(numpy.pi*self.Fp*(q-(m*(self.eps*self.mu)**0.5)/(self.Sc)-self.Dr))**2)/(numpy.exp((numpy.pi*self.Fp*(q-(m*(self.eps*self.mu)**0.5)/(self.Sc)-self.Dr))**2))
+        return (1-2*(numpy.pi*self.Fp*(q-(m*(self.eps*self.mu)**0.5)/(self.Sc)-self.Dr))**2)/\
+         (numpy.exp((numpy.pi*self.Fp*(q-(m*(self.eps*self.mu)**0.5)/(self.Sc)-self.Dr))**2))
+
 
 
 if __name__ == '__main__':
     # Волновое сопротивление свободного пространства
     W0 = 120.0 * numpy.pi
 
-    #Скорость света в вакууме
-    c=299792458
+    # Скорость света в вакууме
+    c = 299792458.0
 
-    #Диэлектрическая проницаемость среды
-    Eps=1.5
-
-    #Скорость волны
-    v=c/numpy.sqrt(Eps)
-
-    # Размер области моделирования вдоль оси X, в метрах
-    X=4.5
-    
     # Число Куранта
     Sc = 1.0
+
+    # Время расчета в секундах
+    maxTime_s = 50e-9
     
-    # Размер области моделирования в отсчетах
-    maxSize = 200
+    
+    # Размер области моделирования в метрах
+    maxSize_m = 4.5
+
+    # Дискрет по пространству в м
+    dx = 1e-2
+
+    # Скорость обновления графика поля
+    speed_refresh = 10
+
+    # Диэлектрическая проницаемость
+    Eps=1.5
+
+    # Скорость распространения волны
+    v=c/numpy.sqrt(Eps)
+    
+    # Переход к дискретным отсчетам
+    # Дискрет по времени
+    dt = dx * Sc / v
+
+    sampler_x = Sampler(dx)
+    sampler_t = Sampler(dt)
 
     # Время расчета в отсчетах
-    maxTime = 1000
+    maxTime = sampler_t.sample(maxTime_s)
 
-    # Размер дискрета по пространству
-    dx=X/maxSize
-
-    #Размер дискрета по времени
-    dt=Sc*dx/v
-
-    #Шаг по частоте
-    df=1/(maxTime*dt)
+    # Размер области моделирования в отсчетах
+    maxSize = sampler_x.sample(maxSize_m)
     
+    # Положение источника в метрах
+    sourcePos_m = maxSize_m/2
     # Положение источника в отсчетах
-    sourcePos = maxSize//2
+    sourcePos = math.floor(sourcePos_m / dx + 0.5) 
 
+    # Положение датчика
+    probesPos_m = 2.5
     # Датчики для регистрации поля
-    probesPos = [160]
+    probesPos = [math.floor( probesPos_m / dx + 0.5)]
     probes = [tools.Probe(pos, maxTime) for pos in probesPos]
+
+    probesPos_1 = math.floor( probesPos_m / dx + 0.5)
+    
 
     # Параметры среды
     # Диэлектрическая проницаемость
@@ -84,11 +102,13 @@ if __name__ == '__main__':
     # Магнитная проницаемость
     mu = numpy.ones(maxSize - 1)
 
+    
+    # Массивы для Ez и Hy
     Ez = numpy.zeros(maxSize)
     Hy = numpy.zeros(maxSize - 1)
-    source = Ricker(30, 0.1, Sc, eps[sourcePos], mu[sourcePos])
+    source = Ricker(10, 0.1, Sc, eps[sourcePos], mu[sourcePos])
 
-    # Ez[1] в предыдущий момент времени
+     # Ez[1] в предыдущий момент времени
     oldEzLeft = Ez[1]
 
     # Ez[-2] в предыдущий момент времени
@@ -104,58 +124,72 @@ if __name__ == '__main__':
     display_ylabel = 'Ez, В/м'
     display_ymin = -1.1
     display_ymax = 1.1
-
-    # Создание экземпляра класса для отображения
-    # распределения поля в пространстве
-    display = tools.AnimateFieldDisplay(maxSize,
+    
+    display = tools.AnimateFieldDisplay(dx, dt,
+                                        maxSize,
                                         display_ymin, display_ymax,
                                         display_ylabel)
+
 
     display.activate()
     display.drawProbes(probesPos)
     display.drawSources([sourcePos])
 
-    for q in range(maxTime):
+    for t in range(maxTime):
         # Расчет компоненты поля H
         Hy = Hy + (Ez[1:] - Ez[:-1]) * Sc / (W0 * mu)
         Hy[0]=0
 
         # Источник возбуждения с использованием метода
         # Total Field / Scattered Field
-        Hy[sourcePos - 1] -= Sc / (W0 * mu[sourcePos - 1]) * source.getE(0, q)
+        Hy[sourcePos - 1] -= Sc / (W0 * mu[sourcePos - 1]) * source.getE(0, t)
 
+        
         # Расчет компоненты поля E
-        Hy_shift = Hy[: -1]
+        Hy_shift = Hy[:-1]
         Ez[1:-1] = Ez[1: -1] + (Hy[1:] - Hy_shift) * Sc * W0 / eps[1: -1]
 
         # Источник возбуждения с использованием метода
         # Total Field / Scattered Field
         Ez[sourcePos] += (Sc / (numpy.sqrt(eps[sourcePos] * mu[sourcePos])) *
-                          source.getE(-0.5, q + 0.5))
-
-        # Граничные условия ABC первой степени справа и PMC слева
+                          source.getE(-0.5, t + 0.5))
+        # Граничные условия для поля E
         Ez[0] = 0
-
         Ez[-1] = oldEzRight + koeffABCRight * (Ez[-2] - Ez[-1])
         oldEzRight = Ez[-2]
-
+        
         # Регистрация поля в датчиках
         for probe in probes:
             probe.addData(Ez, Hy)
 
-        if q % 2 == 0:
-            display.updateData(display_field, q)
+        if t % speed_refresh == 0:
+            display.updateData(display_field, t)
 
     display.stop()
 
     # Отображение сигнала, сохраненного в датчиках
-    tools.showProbeSignals(probes, -1.1, 1.1)
-    spectr=fftshift(abs(fft(probe.E)))
-    spectr/=numpy.max(spectr)
-    freq=numpy.arange(-maxTime/2,maxTime/2)*df
-    plt.plot(freq,spectr)
-    plt.grid()
-    plt.ylabel("$|S(f)/Smax|$")
-    plt.xlabel(r"$f$,Гц")
-    plt.show()
-    
+    #tools.showProbeSignals(probes, dx, dt, -2.1, 2.1)
+
+EzSpec = fftshift(numpy.abs(fft(probe.E))) # Расчёт спектра сигнала
+dt = Sc * dx / c # Рассчитываем дискрет по времени
+df = 1.0 / (maxTime * dt) # Рассчёт шага частоты
+freq = numpy.arange(-maxTime / 2 , maxTime / 2 )*df # Рассчёт частотной сетки
+tlist = numpy.arange(0, maxTime * dt, dt) # Оформляем сетку
+
+# Вывод сигнала и спектра
+fig, (ax1, ax2) = plt.subplots(2, 1)
+ax1.set_xlim(0, maxTime * dt)
+ax1.set_ylim(-0.5, 1.1)
+ax1.set_xlabel('t, с')
+ax1.set_ylabel('Ez, В/м')
+ax1.plot(tlist, probe.E)
+ax1.minorticks_on()
+ax1.grid()
+ax2.set_xlim(0, 10e9)
+ax2.set_ylim(0, 1.1)
+ax2.set_xlabel('f, Гц')
+ax2.set_ylabel('|S| / |Smax|, б/р')
+ax2.plot(freq, EzSpec / numpy.max(EzSpec))
+ax2.minorticks_on()
+ax2.grid()
+plt.show()
