@@ -60,9 +60,13 @@ if __name__ == '__main__':
     # Электрическая постоянная
     eps0 = 8.854187817e-12
 
+    #Fmin и Fmax
+    Fmax = 4e9
+    Fmin = 1e9
+
     # Дискрет по пространству в м
     dx = 5e-4
-
+    
     # Число Куранта
     Sc = 1.0
 
@@ -95,8 +99,6 @@ if __name__ == '__main__':
                    LayerContinuous(d0_m+d1_m+d2_m, eps= eps_3, sigma=0.0)
                    ]
 
-
-
     # Скорость обновления графика поля
     speed_refresh = 1000
 
@@ -109,6 +111,9 @@ if __name__ == '__main__':
 
     # Время расчета в отсчетах
     maxTime = sampler_t.sample(maxTime_s)
+
+    # Дискрет по частоте
+    df = 1.0 / (maxTime * dt)
 
     # Размер области моделирования в отсчетах
     maxSize = sampler_x.sample(maxSize_m)
@@ -124,7 +129,6 @@ if __name__ == '__main__':
 
     # Массив хранящий значения падающей волны
     source_E = np.ones(maxTime)
-
 
     # Параметры среды
     # Диэлектрическая проницаемость
@@ -208,7 +212,6 @@ if __name__ == '__main__':
             display.updateData(display_field, t)
 
     display.stop()
-
     
     # Расчет спектров излученного и отрженного сигналов
     Ez1Spec = fftshift(np.abs(fft(probe.E)))
@@ -217,17 +220,9 @@ if __name__ == '__main__':
     Gamma = Ez1Spec / Ez0Spec
 
     tlist = np.arange(0, maxTime * dt, dt)
-
-    df = 1.0 / (maxTime * dt)
-
     flist = np.arange(-maxTime / 2 , maxTime / 2 , 1)*df
-
+    
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1)
-
-    Fmax = 4e9
-    Fmin = 1e9
-
-
     ax1.set_xlim(0, 1 * maxTime * dt)
     ax1.set_ylim(-0.5, 1.2)
     ax1.set_xlabel('t, с')
@@ -240,7 +235,6 @@ if __name__ == '__main__':
     ax1.minorticks_on()
     ax1.grid()
 
-
     ax2.set_xlim(Fmin, 1.25 * Fmax)
     ax2.set_xlabel('f, Гц')
     ax2.set_ylabel('|F{Ez}|, В*с/м')
@@ -251,7 +245,6 @@ if __name__ == '__main__':
      loc='upper right')
     ax2.minorticks_on()
     ax2.grid()
-
 
     ax3.set_xlim(Fmin, Fmax)
     ax3.set_ylim(0.25, 0.65)
