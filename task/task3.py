@@ -61,11 +61,15 @@ if __name__ == '__main__':
     # Скорость обновления графика поля
     speed_refresh = 10
 
+    # Параметры среды
     # Диэлектрическая проницаемость
-    Eps=1.5
+    eps=1.5
+
+    # Магнитная проницаемость
+    mu=1
 
     # Скорость распространения волны
-    v=c/numpy.sqrt(Eps)
+    v=c/numpy.sqrt(eps)
     
     # Переход к дискретным отсчетам
     # Дискрет по времени
@@ -92,21 +96,11 @@ if __name__ == '__main__':
     probes = [tools.Probe(pos, maxTime) for pos in probesPos]
 
     probesPos_1 = math.floor( probesPos_m / dx + 0.5)
-    
 
-    # Параметры среды
-    # Диэлектрическая проницаемость
-    eps = numpy.ones(maxSize)
-    eps[:] = Eps
-
-    # Магнитная проницаемость
-    mu = numpy.ones(maxSize - 1)
-
-    
     # Массивы для Ez и Hy
     Ez = numpy.zeros(maxSize)
     Hy = numpy.zeros(maxSize - 1)
-    source = Ricker(10, 0.1, Sc, eps[sourcePos], mu[sourcePos])
+    source = Ricker(10, 0.1, Sc, eps, mu)
 
      # Ez[1] в предыдущий момент времени
     oldEzLeft = Ez[1]
@@ -116,7 +110,7 @@ if __name__ == '__main__':
 
     # Расчет коэффициентов для граничных условий справа
     
-    tempRight = Sc / numpy.sqrt(mu[-1] * eps[-1])
+    tempRight = Sc / numpy.sqrt(mu * eps)
     koeffABCRight = (tempRight - 1) / (tempRight + 1)
 
     # Параметры отображения поля E
@@ -130,7 +124,6 @@ if __name__ == '__main__':
                                         display_ymin, display_ymax,
                                         display_ylabel)
 
-
     display.activate()
     display.drawProbes(probesPos)
     display.drawSources([sourcePos])
@@ -142,16 +135,15 @@ if __name__ == '__main__':
 
         # Источник возбуждения с использованием метода
         # Total Field / Scattered Field
-        Hy[sourcePos - 1] -= Sc / (W0 * mu[sourcePos - 1]) * source.getE(0, t)
+        Hy[sourcePos - 1] -= Sc / (W0 * mu) * source.getE(0, t)
 
-        
         # Расчет компоненты поля E
         Hy_shift = Hy[:-1]
-        Ez[1:-1] = Ez[1: -1] + (Hy[1:] - Hy_shift) * Sc * W0 / eps[1: -1]
+        Ez[1:-1] = Ez[1: -1] + (Hy[1:] - Hy_shift) * Sc * W0 / eps
 
         # Источник возбуждения с использованием метода
         # Total Field / Scattered Field
-        Ez[sourcePos] += (Sc / (numpy.sqrt(eps[sourcePos] * mu[sourcePos])) *
+        Ez[sourcePos] += (Sc / (numpy.sqrt(eps * mu)) *
                           source.getE(-0.5, t + 0.5))
         # Граничные условия для поля E
         Ez[0] = 0
@@ -167,29 +159,31 @@ if __name__ == '__main__':
 
     display.stop()
 
-    # Отображение сигнала, сохраненного в датчиках
-    #tools.showProbeSignals(probes, dx, dt, -2.1, 2.1)
+    # Расчёт спектра сигнала
+    EzSpec = fftshift(numpy.abs(fft(probe.E)))
+    # Рассчитываем дискрет по времени
+    dt = Sc * dx / c
+    # Рассчёт шага частоты
+    df = 1.0 / (maxTime * dt)
+    # Рассчёт частотной сетки
+    freq = numpy.arange(-maxTime / 2 , maxTime / 2 )*df
+    # Оформляем сетку
+    tlist = numpy.arange(0, maxTime * dt, dt) 
 
-EzSpec = fftshift(numpy.abs(fft(probe.E))) # Расчёт спектра сигнала
-dt = Sc * dx / c # Рассчитываем дискрет по времени
-df = 1.0 / (maxTime * dt) # Рассчёт шага частоты
-freq = numpy.arange(-maxTime / 2 , maxTime / 2 )*df # Рассчёт частотной сетки
-tlist = numpy.arange(0, maxTime * dt, dt) # Оформляем сетку
-
-# Вывод сигнала и спектра
-fig, (ax1, ax2) = plt.subplots(2, 1)
-ax1.set_xlim(0, maxTime * dt)
-ax1.set_ylim(-0.5, 1.1)
-ax1.set_xlabel('t, с')
-ax1.set_ylabel('Ez, В/м')
-ax1.plot(tlist, probe.E)
-ax1.minorticks_on()
-ax1.grid()
-ax2.set_xlim(0, 10e9)
-ax2.set_ylim(0, 1.1)
-ax2.set_xlabel('f, Гц')
-ax2.set_ylabel('|S| / |Smax|, б/р')
-ax2.plot(freq, EzSpec / numpy.max(EzSpec))
-ax2.minorticks_on()
-ax2.grid()
-plt.show()
+    # Вывод сигнала и спектра зарегестрированых в датчике
+    fig, (ax1, ax2) = plt.subplots(2, 1)
+    ax1.set_xlim(0, maxTime * dt/10)
+    ax1.set_ylim(-0.6, 1.0)
+    ax1.set_xlabel('t, с')
+    ax1.set_ylabel('Ez, В/м')
+    ax1.plot(tlist, probe.E)
+    ax1.minorticks_on()
+    ax1.grid()
+    ax2.set_xlim(0, 10e9)
+    ax2.set_ylim(0, 1.1)
+    ax2.set_xlabel('f, Гц')
+    ax2.set_ylabel('|S| / |Smax|, б/р')
+    ax2.plot(freq, EzSpec / numpy.max(EzSpec))
+    ax2.minorticks_on()
+    ax2.grid()
+    plt.show()
