@@ -49,17 +49,17 @@ if __name__ == '__main__':
     Sc = 1.0
 
     # Время расчета в секундах
-    maxTime_s = 50e-9
+    maxTime_s = 15e-9
     
     
     # Размер области моделирования в метрах
     maxSize_m = 4.5
 
     # Дискрет по пространству в м
-    dx = 1e-2
+    dx = 1e-3
 
     # Скорость обновления графика поля
-    speed_refresh = 10
+    speed_refresh = 100
 
     # Параметры среды
     # Диэлектрическая проницаемость
@@ -100,10 +100,7 @@ if __name__ == '__main__':
     # Массивы для Ez и Hy
     Ez = numpy.zeros(maxSize)
     Hy = numpy.zeros(maxSize - 1)
-    source = Ricker(10, 0.1, Sc, eps, mu)
-
-     # Ez[1] в предыдущий момент времени
-    oldEzLeft = Ez[1]
+    source = Ricker(100, 0.01, Sc, eps, mu)
 
     # Ez[-2] в предыдущий момент времени
     oldEzRight = Ez[-2]
@@ -161,8 +158,7 @@ if __name__ == '__main__':
 
     # Расчёт спектра сигнала
     EzSpec = fftshift(numpy.abs(fft(probe.E)))
-    # Рассчитываем дискрет по времени
-    dt = Sc * dx / c
+   
     # Рассчёт шага частоты
     df = 1.0 / (maxTime * dt)
     # Рассчёт частотной сетки
@@ -172,8 +168,8 @@ if __name__ == '__main__':
 
     # Вывод сигнала и спектра зарегестрированых в датчике
     fig, (ax1, ax2) = plt.subplots(2, 1)
-    ax1.set_xlim(0, maxTime * dt/10)
-    ax1.set_ylim(-0.6, 1.0)
+    ax1.set_xlim(1.1e-9, 2.6e-9)
+    ax1.set_ylim(-0.6, 1.1)
     ax1.set_xlabel('t, с')
     ax1.set_ylabel('Ez, В/м')
     ax1.plot(tlist, probe.E)
